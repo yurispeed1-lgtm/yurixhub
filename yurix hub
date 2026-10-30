@@ -1,0 +1,1357 @@
+--==================================================
+-- YURIX HUB // ADMIN PANEL V5.0 - SUPREME EDITION
+--==================================================
+
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+local RS = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local Lighting = game:GetService("Lighting")
+local HttpService = game:GetService("HttpService")
+local player = Players.LocalPlayer
+local cam = workspace.CurrentCamera
+local mouse = player:GetMouse()
+
+local Config = {
+    Aimbot = false, FOV = 150,
+    ESP = false, ESPBox = false, ESPDistance = false, ESPNames = false,
+    Hitbox = false, HitboxSize = 15,
+    Noclip = false, FullBright = false,
+    Fly = false, Speed = 16,
+    InfiniteJump = false,
+    AntiKick = false,
+    SpeedBoost = false, SpeedBoostValue = 50,
+    GodMode = false,
+    ShowFOV = true,
+    AimbotBone = "HumanoidRootPart",
+    Theme = 0,
+    MenuKey = Enum.KeyCode.P,
+    Crosshair = false,
+    CrosshairSize = 10,
+    CrosshairColor = Color3.new(1, 0, 0),
+    Freecam = false,
+    FreecamSpeed = 30,
+    Gravity = 196.2,
+    CustomName = "",
+}
+
+local Profiles = {}
+local currentProfileName = "Padrão"
+local originalAppearance = {}
+local disguiseActive = false
+local freecamCF = CFrame.new()
+local hue = 0
+local menuOpen = false
+local currentTab = "COMBATE"
+local actionLog = {}
+
+local Themes = {
+    {name = "Vermelho", h = 0},
+    {name = "Roxo", h = 0.75},
+    {name = "Azul", h = 0.6},
+    {name = "Verde", h = 0.35},
+    {name = "Laranja", h = 0.07},
+}
+
+local gui = Instance.new("ScreenGui", player.PlayerGui)
+gui.Name = "YurixAdminV5"
+gui.ResetOnSpawn = false
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+local crosshairH = Instance.new("Frame", gui)
+crosshairH.AnchorPoint = Vector2.new(0.5, 0.5)
+crosshairH.BorderSizePixel = 0
+crosshairH.BackgroundColor3 = Color3.new(1, 0, 0)
+crosshairH.ZIndex = 200; crosshairH.Visible = false
+
+local crosshairV = Instance.new("Frame", gui)
+crosshairV.AnchorPoint = Vector2.new(0.5, 0.5)
+crosshairV.BorderSizePixel = 0
+crosshairV.BackgroundColor3 = Color3.new(1, 0, 0)
+crosshairV.ZIndex = 200; crosshairV.Visible = false
+
+local function updateCrosshair()
+    local vp = cam.ViewportSize
+    local cx, cy = vp.X / 2, vp.Y / 2
+    local sz = Config.CrosshairSize
+    crosshairH.Size = UDim2.fromOffset(sz * 2, 2)
+    crosshairH.Position = UDim2.fromOffset(cx, cy)
+    crosshairV.Size = UDim2.fromOffset(2, sz * 2)
+    crosshairV.Position = UDim2.fromOffset(cx, cy)
+    crosshairH.BackgroundColor3 = Config.CrosshairColor
+    crosshairV.BackgroundColor3 = Config.CrosshairColor
+    crosshairH.Visible = Config.Crosshair
+    crosshairV.Visible = Config.Crosshair
+end
+
+local shadow = Instance.new("ImageLabel", gui)
+shadow.Size = UDim2.fromScale(0.38, 0.84)
+shadow.Position = UDim2.fromScale(0.5, 0.5)
+shadow.AnchorPoint = Vector2.new(0.5, 0.5)
+shadow.BackgroundTransparency = 1
+shadow.Image = "rbxassetid://6014261993"
+shadow.ImageColor3 = Color3.new(0, 0, 0)
+shadow.ImageTransparency = 0.5
+shadow.ScaleType = Enum.ScaleType.Slice
+shadow.SliceCenter = Rect.new(49, 49, 450, 450)
+shadow.Visible = false
+
+local main = Instance.new("Frame", gui)
+main.Size = UDim2.fromScale(0.35, 0.8)
+main.Position = UDim2.fromScale(0.5, 0.5)
+main.AnchorPoint = Vector2.new(0.5, 0.5)
+main.BackgroundColor3 = Color3.fromRGB(10, 10, 14)
+main.BorderSizePixel = 0
+main.ClipsDescendants = true
+main.Visible = false
+main.BackgroundTransparency = 1
+
+local canvasGroup = Instance.new("CanvasGroup", main)
+canvasGroup.Size = UDim2.fromScale(1, 1)
+canvasGroup.BackgroundTransparency = 1
+canvasGroup.GroupTransparency = 1
+
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 16)
+local stroke = Instance.new("UIStroke", main)
+stroke.Thickness = 2
+stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+local bgBase = Instance.new("Frame", canvasGroup)
+bgBase.Size = UDim2.fromScale(1, 1)
+bgBase.BackgroundColor3 = Color3.fromRGB(10, 10, 14)
+bgBase.BorderSizePixel = 0; bgBase.ZIndex = 0
+
+local bgGradient = Instance.new("UIGradient", bgBase)
+bgGradient.Rotation = 135
+
+local animBg = Instance.new("Frame", canvasGroup)
+animBg.Size = UDim2.fromScale(1, 1)
+animBg.BackgroundTransparency = 1
+animBg.ZIndex = 1; animBg.ClipsDescendants = true
+
+local stars = {}
+for i = 1, 35 do
+    local s = Instance.new("Frame", animBg)
+    local sz = math.random(2, 5)
+    s.Size = UDim2.fromOffset(sz, sz)
+    s.AnchorPoint = Vector2.new(0.5, 0.5)
+    s.BorderSizePixel = 0; s.ZIndex = 2
+    Instance.new("UICorner", s).CornerRadius = UDim.new(1, 0)
+    table.insert(stars, {
+        obj = s, x = math.random(), y = math.random(),
+        speedX = (math.random() - 0.5) * 0.0008,
+        speedY = (math.random() - 0.5) * 0.0008,
+        pulse = math.random() * math.pi * 2,
+        pulseSpeed = 0.03 + math.random() * 0.04,
+        hueOffset = math.random() * 0.4, size = sz,
+    })
+end
+
+local scanLines = {}
+for i = 1, 3 do
+    local line = Instance.new("Frame", animBg)
+    line.Size = UDim2.new(1, 0, 0, 1)
+    line.BackgroundColor3 = Color3.new(1, 1, 1)
+    line.BackgroundTransparency = 0.85
+    line.BorderSizePixel = 0; line.ZIndex = 2
+    local lineGrad = Instance.new("UIGradient", line)
+    lineGrad.Rotation = 0
+    lineGrad.Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 1),
+        NumberSequenceKeypoint.new(0.3, 0.6),
+        NumberSequenceKeypoint.new(0.5, 0),
+        NumberSequenceKeypoint.new(0.7, 0.6),
+        NumberSequenceKeypoint.new(1, 1),
+    })
+    table.insert(scanLines, {obj = line, grad = lineGrad, y = math.random(), speed = 0.0015 + math.random() * 0.001})
+end
+
+local gridFrame = Instance.new("Frame", canvasGroup)
+gridFrame.Size = UDim2.fromScale(1, 1)
+gridFrame.BackgroundTransparency = 1
+gridFrame.ZIndex = 1; gridFrame.ClipsDescendants = true
+for i = 1, 8 do
+    local line = Instance.new("Frame", gridFrame)
+    line.Size = UDim2.new(0, 1, 1, 0)
+    line.Position = UDim2.fromScale(i / 9, 0)
+    line.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    line.BackgroundTransparency = 0.93; line.BorderSizePixel = 0
+end
+for i = 1, 12 do
+    local line = Instance.new("Frame", gridFrame)
+    line.Size = UDim2.new(1, 0, 0, 1)
+    line.Position = UDim2.fromScale(0, i / 13)
+    line.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    line.BackgroundTransparency = 0.93; line.BorderSizePixel = 0
+end
+
+local glow1 = Instance.new("ImageLabel", canvasGroup)
+glow1.Size = UDim2.fromOffset(300, 300); glow1.Position = UDim2.fromOffset(-80, -80)
+glow1.BackgroundTransparency = 1; glow1.Image = "rbxassetid://6014261993"
+glow1.ScaleType = Enum.ScaleType.Stretch; glow1.ImageTransparency = 0.6; glow1.ZIndex = 1
+
+local glow2 = Instance.new("ImageLabel", canvasGroup)
+glow2.Size = UDim2.fromOffset(250, 250); glow2.AnchorPoint = Vector2.new(1, 1)
+glow2.Position = UDim2.new(1, 80, 1, 80); glow2.BackgroundTransparency = 1
+glow2.Image = "rbxassetid://6014261993"; glow2.ScaleType = Enum.ScaleType.Stretch
+glow2.ImageTransparency = 0.7; glow2.ZIndex = 1
+
+local headerFrame = Instance.new("Frame", canvasGroup)
+headerFrame.Size = UDim2.new(1, 0, 0, 65)
+headerFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+headerFrame.BackgroundTransparency = 0.3; headerFrame.BorderSizePixel = 0; headerFrame.ZIndex = 5
+
+local headerGrad = Instance.new("UIGradient", headerFrame); headerGrad.Rotation = 90
+
+local headerDivider = Instance.new("Frame", headerFrame)
+headerDivider.Size = UDim2.new(1, 0, 0, 2)
+headerDivider.Position = UDim2.new(0, 0, 1, -2)
+headerDivider.BackgroundColor3 = Color3.new(1, 0, 0)
+headerDivider.BorderSizePixel = 0; headerDivider.ZIndex = 6
+
+local activeBar = Instance.new("Frame", headerFrame)
+activeBar.Size = UDim2.new(0, 0, 0, 3)
+activeBar.Position = UDim2.new(0, 0, 0, 0)
+activeBar.BackgroundColor3 = Color3.new(1, 0, 0)
+activeBar.BorderSizePixel = 0; activeBar.ZIndex = 8
+local activeBarGrad = Instance.new("UIGradient", activeBar)
+
+local activeCount = 0
+local totalToggles = 0
+local function updateActiveBar()
+    local pct = totalToggles > 0 and (activeCount / totalToggles) or 0
+    TweenService:Create(activeBar, TweenInfo.new(0.4, Enum.EasingStyle.Quart), {
+        Size = UDim2.new(pct, 0, 0, 3)
+    }):Play()
+end
+
+local dragHandle = Instance.new("Frame", headerFrame)
+dragHandle.Size = UDim2.fromScale(1, 1)
+dragHandle.BackgroundTransparency = 1; dragHandle.ZIndex = 10
+
+local iconLabel = Instance.new("TextLabel", headerFrame)
+iconLabel.Size = UDim2.new(0, 50, 1, 0); iconLabel.Position = UDim2.new(0, 10, 0, 0)
+iconLabel.Text = "👻"; iconLabel.TextSize = 28; iconLabel.BackgroundTransparency = 1; iconLabel.ZIndex = 7
+
+local headerTitle = Instance.new("TextLabel", headerFrame)
+headerTitle.Size = UDim2.new(0.45, 0, 0, 30); headerTitle.Position = UDim2.new(0, 55, 0, 5)
+headerTitle.Text = "YURIX HUB"; headerTitle.Font = Enum.Font.GothamBold; headerTitle.TextSize = 20
+headerTitle.BackgroundTransparency = 1; headerTitle.TextXAlignment = Enum.TextXAlignment.Left; headerTitle.ZIndex = 7
+
+local headerSub = Instance.new("TextLabel", headerFrame)
+headerSub.Size = UDim2.new(0.45, 0, 0, 14); headerSub.Position = UDim2.new(0, 57, 0, 36)
+headerSub.Text = "ADMIN PANEL V5.0"; headerSub.Font = Enum.Font.Gotham; headerSub.TextSize = 10
+headerSub.TextColor3 = Color3.fromRGB(160, 160, 180); headerSub.BackgroundTransparency = 1
+headerSub.TextXAlignment = Enum.TextXAlignment.Left; headerSub.ZIndex = 7
+
+local playerCountLabel = Instance.new("TextLabel", headerFrame)
+playerCountLabel.Size = UDim2.new(0.32, 0, 0, 14); playerCountLabel.Position = UDim2.new(0.62, 0, 0, 8)
+playerCountLabel.Text = "👥 " .. #Players:GetPlayers() .. " online"
+playerCountLabel.Font = Enum.Font.Gotham; playerCountLabel.TextSize = 10
+playerCountLabel.TextColor3 = Color3.fromRGB(140, 140, 160); playerCountLabel.BackgroundTransparency = 1
+playerCountLabel.TextXAlignment = Enum.TextXAlignment.Right; playerCountLabel.ZIndex = 7
+
+Players.PlayerAdded:Connect(function()
+    playerCountLabel.Text = "👥 " .. #Players:GetPlayers() .. " online"
+end)
+Players.PlayerRemoving:Connect(function()
+    task.wait(0.1)
+    playerCountLabel.Text = "👥 " .. #Players:GetPlayers() .. " online"
+end)
+
+local activeCountLabel = Instance.new("TextLabel", headerFrame)
+activeCountLabel.Size = UDim2.new(0.32, 0, 0, 14); activeCountLabel.Position = UDim2.new(0.62, 0, 0, 26)
+activeCountLabel.Text = "0 ativos"; activeCountLabel.Font = Enum.Font.GothamBold; activeCountLabel.TextSize = 10
+activeCountLabel.TextColor3 = Color3.fromRGB(200, 80, 80); activeCountLabel.BackgroundTransparency = 1
+activeCountLabel.TextXAlignment = Enum.TextXAlignment.Right; activeCountLabel.ZIndex = 7
+
+local disguiseLabel = Instance.new("TextLabel", headerFrame)
+disguiseLabel.Size = UDim2.new(0.32, 0, 0, 12); disguiseLabel.Position = UDim2.new(0.62, 0, 0, 44)
+disguiseLabel.Text = ""; disguiseLabel.Font = Enum.Font.Gotham; disguiseLabel.TextSize = 9
+disguiseLabel.TextColor3 = Color3.fromRGB(255, 200, 50); disguiseLabel.BackgroundTransparency = 1
+disguiseLabel.TextXAlignment = Enum.TextXAlignment.Right; disguiseLabel.ZIndex = 7
+
+local closeBtn = Instance.new("TextButton", headerFrame)
+closeBtn.Size = UDim2.new(0, 26, 0, 26); closeBtn.Position = UDim2.new(1, -34, 0.5, -13)
+closeBtn.BackgroundColor3 = Color3.fromRGB(180, 30, 30); closeBtn.Text = "✕"
+closeBtn.TextColor3 = Color3.new(1, 1, 1); closeBtn.Font = Enum.Font.GothamBold
+closeBtn.TextSize = 12; closeBtn.ZIndex = 11
+Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(1, 0)
+
+local minBtn = Instance.new("TextButton", headerFrame)
+minBtn.Size = UDim2.new(0, 26, 0, 26); minBtn.Position = UDim2.new(1, -64, 0.5, -13)
+minBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 60); minBtn.Text = "—"
+minBtn.TextColor3 = Color3.new(1, 1, 1); minBtn.Font = Enum.Font.GothamBold
+minBtn.TextSize = 12; minBtn.ZIndex = 11
+Instance.new("UICorner", minBtn).CornerRadius = UDim.new(1, 0)
+
+local miniBar = Instance.new("Frame", gui)
+miniBar.Size = UDim2.new(0, 180, 0, 36)
+miniBar.Position = UDim2.new(0, 10, 0.5, 0)
+miniBar.BackgroundColor3 = Color3.fromRGB(12, 12, 18)
+miniBar.BackgroundTransparency = 0.1; miniBar.BorderSizePixel = 0; miniBar.Visible = false; miniBar.ZIndex = 50
+Instance.new("UICorner", miniBar).CornerRadius = UDim.new(0, 10)
+local miniStroke = Instance.new("UIStroke", miniBar); miniStroke.Thickness = 1.5
+
+local miniTitle = Instance.new("TextLabel", miniBar)
+miniTitle.Size = UDim2.new(0.7, 0, 1, 0); miniTitle.Position = UDim2.new(0, 10, 0, 0)
+miniTitle.Text = "👻 YURIX HUB"; miniTitle.Font = Enum.Font.GothamBold; miniTitle.TextSize = 12
+miniTitle.TextColor3 = Color3.new(1, 1, 1); miniTitle.BackgroundTransparency = 1
+miniTitle.TextXAlignment = Enum.TextXAlignment.Left; miniTitle.ZIndex = 51
+
+local miniExpand = Instance.new("TextButton", miniBar)
+miniExpand.Size = UDim2.new(0, 28, 0, 28); miniExpand.Position = UDim2.new(1, -34, 0.5, -14)
+miniExpand.BackgroundColor3 = Color3.fromRGB(40, 40, 60); miniExpand.Text = "□"
+miniExpand.TextColor3 = Color3.new(1, 1, 1); miniExpand.Font = Enum.Font.GothamBold
+miniExpand.TextSize = 11; miniExpand.ZIndex = 52
+Instance.new("UICorner", miniExpand).CornerRadius = UDim.new(1, 0)
+
+local function openMenu()
+    menuOpen = true
+    miniBar.Visible = false
+    main.Visible = true; shadow.Visible = true
+    main.Size = UDim2.fromScale(0.08, 0.08)
+    main.BackgroundTransparency = 1; canvasGroup.GroupTransparency = 1
+    TweenService:Create(main, TweenInfo.new(0.55, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+        {Size = UDim2.fromScale(0.35, 0.8), BackgroundTransparency = 0}):Play()
+    TweenService:Create(canvasGroup, TweenInfo.new(0.45), {GroupTransparency = 0}):Play()
+    TweenService:Create(shadow, TweenInfo.new(0.4), {ImageTransparency = 0.5}):Play()
+end
+
+local function closeMenu()
+    menuOpen = false
+    TweenService:Create(main, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.In),
+        {Size = UDim2.fromScale(0.08, 0.08), BackgroundTransparency = 1}):Play()
+    TweenService:Create(canvasGroup, TweenInfo.new(0.2), {GroupTransparency = 1}):Play()
+    TweenService:Create(shadow, TweenInfo.new(0.3), {ImageTransparency = 1}):Play()
+    task.wait(0.45)
+    if not menuOpen then main.Visible = false; shadow.Visible = false end
+end
+
+local function toggleMenu()
+    if menuOpen then closeMenu() else openMenu() end
+end
+
+minBtn.MouseButton1Click:Connect(function()
+    menuOpen = false
+    TweenService:Create(main, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.In),
+        {Size = UDim2.fromScale(0.08, 0.04), BackgroundTransparency = 1}):Play()
+    TweenService:Create(canvasGroup, TweenInfo.new(0.2), {GroupTransparency = 1}):Play()
+    TweenService:Create(shadow, TweenInfo.new(0.2), {ImageTransparency = 1}):Play()
+    task.wait(0.35)
+    main.Visible = false; shadow.Visible = false; miniBar.Visible = true
+end)
+
+miniExpand.MouseButton1Click:Connect(openMenu)
+closeBtn.MouseButton1Click:Connect(function()
+    menuOpen = false
+    TweenService:Create(main, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.In),
+        {Size = UDim2.fromScale(0.1, 0.1), BackgroundTransparency = 1}):Play()
+    TweenService:Create(canvasGroup, TweenInfo.new(0.2), {GroupTransparency = 1}):Play()
+    TweenService:Create(shadow, TweenInfo.new(0.3), {ImageTransparency = 1}):Play()
+    task.wait(0.4); main.Visible = false; shadow.Visible = false
+end)
+
+local tabBar = Instance.new("Frame", canvasGroup)
+tabBar.Size = UDim2.new(1, 0, 0, 38); tabBar.Position = UDim2.new(0, 0, 0, 65)
+tabBar.BackgroundColor3 = Color3.fromRGB(12, 12, 17); tabBar.BackgroundTransparency = 0.2
+tabBar.BorderSizePixel = 0; tabBar.ZIndex = 5
+local tabLayout = Instance.new("UIListLayout", tabBar)
+tabLayout.FillDirection = Enum.FillDirection.Horizontal
+tabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+tabLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+tabLayout.Padding = UDim.new(0, 3)
+
+local tabs = {"COMBATE", "MOVIMENTO", "MUNDO", "ADMIN", "JOGADORES", "DISFARCE", "CONFIG"}
+local tabBtns = {}
+local tabFrames = {}
+
+local contentArea = Instance.new("Frame", canvasGroup)
+contentArea.Size = UDim2.new(1, 0, 1, -110); contentArea.Position = UDim2.new(0, 0, 0, 110)
+contentArea.BackgroundTransparency = 1; contentArea.ZIndex = 3
+
+for _, tabName in ipairs(tabs) do
+    local btn = Instance.new("TextButton", tabBar)
+    btn.Size = UDim2.new(0, 57, 0, 28); btn.BackgroundColor3 = Color3.fromRGB(20, 20, 26)
+    btn.BackgroundTransparency = 0.5; btn.Text = tabName
+    btn.TextColor3 = Color3.fromRGB(140, 140, 160); btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 7; btn.ZIndex = 6
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+
+    local tabUnderline = Instance.new("Frame", btn)
+    tabUnderline.Size = UDim2.new(0, 0, 0, 2); tabUnderline.Position = UDim2.new(0.5, 0, 1, -2)
+    tabUnderline.AnchorPoint = Vector2.new(0.5, 0); tabUnderline.BackgroundColor3 = Color3.new(1, 0, 0)
+    tabUnderline.BorderSizePixel = 0; tabUnderline.ZIndex = 7
+
+    local tabScroll = Instance.new("ScrollingFrame", contentArea)
+    tabScroll.Size = UDim2.fromScale(1, 1); tabScroll.BackgroundTransparency = 1
+    tabScroll.ScrollBarThickness = 3; tabScroll.ScrollBarImageColor3 = Color3.new(1, 0, 0)
+    tabScroll.Visible = tabName == currentTab; tabScroll.ZIndex = 3
+    tabScroll.CanvasSize = UDim2.new(0, 0, 0, 0); tabScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    local listLayout = Instance.new("UIListLayout", tabScroll)
+    listLayout.Padding = UDim.new(0, 8); listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    local padding = Instance.new("UIPadding", tabScroll)
+    padding.PaddingLeft = UDim.new(0, 12); padding.PaddingRight = UDim.new(0, 12); padding.PaddingTop = UDim.new(0, 10)
+
+    tabFrames[tabName] = tabScroll
+    tabBtns[tabName] = {btn = btn, underline = tabUnderline}
+
+    btn.MouseButton1Click:Connect(function()
+        currentTab = tabName
+        for name, data in pairs(tabBtns) do
+            local isActive = (name == tabName)
+            TweenService:Create(data.btn, TweenInfo.new(0.2), {
+                TextColor3 = isActive and Color3.new(1, 1, 1) or Color3.fromRGB(140, 140, 160),
+                BackgroundTransparency = isActive and 0.2 or 0.5,
+            }):Play()
+            TweenService:Create(data.underline, TweenInfo.new(0.25, Enum.EasingStyle.Quart), {
+                Size = isActive and UDim2.new(0.7, 0, 0, 2) or UDim2.new(0, 0, 0, 2)
+            }):Play()
+            tabFrames[name].Visible = isActive
+        end
+    end)
+end
+
+TweenService:Create(tabBtns[currentTab].btn, TweenInfo.new(0), {
+    TextColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 0.2
+}):Play()
+TweenService:Create(tabBtns[currentTab].underline, TweenInfo.new(0), {
+    Size = UDim2.new(0.7, 0, 0, 2)
+}):Play()
+
+local notifHolder = Instance.new("Frame", gui)
+notifHolder.Size = UDim2.new(0, 280, 1, 0); notifHolder.Position = UDim2.new(1, -290, 0, 0)
+notifHolder.BackgroundTransparency = 1; notifHolder.ZIndex = 100
+local notifLayout = Instance.new("UIListLayout", notifHolder)
+notifLayout.VerticalAlignment = Enum.VerticalAlignment.Bottom; notifLayout.Padding = UDim.new(0, 6)
+local notifPad = Instance.new("UIPadding", notifHolder); notifPad.PaddingBottom = UDim.new(0, 10)
+
+local function notify(title, msg, color)
+    color = color or Color3.fromRGB(180, 30, 30)
+    local nf = Instance.new("Frame", notifHolder)
+    nf.Size = UDim2.new(1, 0, 0, 60); nf.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
+    nf.BackgroundTransparency = 0.1; nf.BorderSizePixel = 0; nf.ZIndex = 100
+    Instance.new("UICorner", nf).CornerRadius = UDim.new(0, 10)
+    local nfStroke = Instance.new("UIStroke", nf); nfStroke.Color = color; nfStroke.Thickness = 1.5
+    local bar = Instance.new("Frame", nf); bar.Size = UDim2.new(0, 4, 1, 0)
+    bar.BackgroundColor3 = color; bar.BorderSizePixel = 0; bar.ZIndex = 101
+    Instance.new("UICorner", bar).CornerRadius = UDim.new(0, 4)
+    local t1 = Instance.new("TextLabel", nf); t1.Size = UDim2.new(1, -20, 0, 22); t1.Position = UDim2.new(0, 14, 0, 6)
+    t1.Text = title; t1.Font = Enum.Font.GothamBold; t1.TextSize = 13
+    t1.TextColor3 = Color3.new(1, 1, 1); t1.BackgroundTransparency = 1
+    t1.TextXAlignment = Enum.TextXAlignment.Left; t1.ZIndex = 101
+    local t2 = Instance.new("TextLabel", nf); t2.Size = UDim2.new(1, -20, 0, 18); t2.Position = UDim2.new(0, 14, 0, 30)
+    t2.Text = msg; t2.Font = Enum.Font.Gotham; t2.TextSize = 11
+    t2.TextColor3 = Color3.fromRGB(180, 180, 200); t2.BackgroundTransparency = 1
+    t2.TextXAlignment = Enum.TextXAlignment.Left; t2.ZIndex = 101
+    nf.Position = UDim2.new(1, 20, 0, 0)
+    TweenService:Create(nf, TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+        Position = UDim2.new(0, 0, 0, 0)
+    }):Play()
+    table.insert(actionLog, 1, {time = os.date("%H:%M:%S"), text = title .. ": " .. msg})
+    if #actionLog > 50 then table.remove(actionLog) end
+    task.delay(3.5, function()
+        TweenService:Create(nf, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
+            Position = UDim2.new(1, 20, 0, 0), BackgroundTransparency = 1
+        }):Play()
+        task.wait(0.35); nf:Destroy()
+    end)
+end
+
+local function createSection(parent, title)
+    local sec = Instance.new("Frame", parent); sec.Size = UDim2.new(1, 0, 0, 26); sec.BackgroundTransparency = 1
+    local line = Instance.new("Frame", sec); line.Size = UDim2.new(1, 0, 0, 1); line.Position = UDim2.new(0, 0, 0.5, 0)
+    line.BackgroundColor3 = Color3.fromRGB(50, 50, 60); line.BorderSizePixel = 0
+    local lbl = Instance.new("TextLabel", sec); lbl.Size = UDim2.new(0, 0, 1, 0); lbl.AutomaticSize = Enum.AutomaticSize.X
+    lbl.Text = "  " .. title .. "  "; lbl.Font = Enum.Font.GothamBold; lbl.TextSize = 10
+    lbl.TextColor3 = Color3.fromRGB(160, 160, 180); lbl.BackgroundColor3 = Color3.fromRGB(10, 10, 14)
+    lbl.BackgroundTransparency = 0; lbl.ZIndex = 2
+    return sec
+end
+
+local function createToggle(parent, text, desc, callback)
+    totalToggles = totalToggles + 1
+    local frame = Instance.new("Frame", parent)
+    frame.Size = UDim2.new(1, 0, 0, desc and 52 or 40)
+    frame.BackgroundColor3 = Color3.fromRGB(20, 20, 27); frame.BackgroundTransparency = 0.3; frame.BorderSizePixel = 0
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
+    local leftBar = Instance.new("Frame", frame); leftBar.Size = UDim2.new(0, 3, 0.7, 0)
+    leftBar.Position = UDim2.new(0, 0, 0.15, 0); leftBar.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+    leftBar.BorderSizePixel = 0; Instance.new("UICorner", leftBar).CornerRadius = UDim.new(0, 2)
+    local label = Instance.new("TextLabel", frame); label.Size = UDim2.new(0.72, 0, 0, 20)
+    label.Position = UDim2.new(0, 12, 0, desc and 8 or 10); label.Text = text
+    label.TextColor3 = Color3.new(1, 1, 1); label.Font = Enum.Font.GothamMedium; label.TextSize = 13
+    label.TextXAlignment = Enum.TextXAlignment.Left; label.BackgroundTransparency = 1
+    if desc then
+        local dL = Instance.new("TextLabel", frame); dL.Size = UDim2.new(0.72, 0, 0, 16)
+        dL.Position = UDim2.new(0, 12, 0, 28); dL.Text = desc
+        dL.TextColor3 = Color3.fromRGB(120, 120, 140); dL.Font = Enum.Font.Gotham; dL.TextSize = 10
+        dL.TextXAlignment = Enum.TextXAlignment.Left; dL.BackgroundTransparency = 1
+    end
+    local btn = Instance.new("TextButton", frame); btn.Size = UDim2.new(0, 46, 0, 24)
+    btn.Position = UDim2.new(1, -56, 0.5, -12); btn.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
+    btn.Text = ""; btn.ZIndex = 2; Instance.new("UICorner", btn).CornerRadius = UDim.new(1, 0)
+    local knob = Instance.new("Frame", btn); knob.Size = UDim2.new(0, 18, 0, 18)
+    knob.Position = UDim2.new(0, 3, 0.5, -9); knob.BackgroundColor3 = Color3.fromRGB(180, 180, 200)
+    knob.ZIndex = 3; Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
+    local active = false
+    btn.MouseButton1Click:Connect(function()
+        active = not active
+        if active then activeCount += 1 else activeCount = math.max(0, activeCount - 1) end
+        activeCountLabel.Text = activeCount .. (activeCount == 1 and " ativo" or " ativos")
+        updateActiveBar()
+        TweenService:Create(knob, TweenInfo.new(0.25, Enum.EasingStyle.Quart), {
+            Position = active and UDim2.new(1, -21, 0.5, -9) or UDim2.new(0, 3, 0.5, -9),
+            BackgroundColor3 = active and Color3.new(1, 1, 1) or Color3.fromRGB(180, 180, 200)
+        }):Play()
+        TweenService:Create(btn, TweenInfo.new(0.25), {BackgroundColor3 = active and Color3.fromRGB(150, 0, 0) or Color3.fromRGB(35, 35, 42)}):Play()
+        TweenService:Create(leftBar, TweenInfo.new(0.25), {BackgroundColor3 = active and Color3.new(1, 0.2, 0.2) or Color3.fromRGB(60, 60, 70)}):Play()
+        TweenService:Create(frame, TweenInfo.new(0.25), {BackgroundColor3 = active and Color3.fromRGB(35, 15, 15) or Color3.fromRGB(20, 20, 27)}):Play()
+        callback(active)
+        notify(text, active and "Ativado" or "Desativado", active and Color3.fromRGB(200, 50, 50) or Color3.fromRGB(80, 80, 100))
+    end)
+    return frame
+end
+
+local function createSlider(parent, text, min, max, default, callback)
+    local frame = Instance.new("Frame", parent); frame.Size = UDim2.new(1, 0, 0, 58)
+    frame.BackgroundColor3 = Color3.fromRGB(20, 20, 27); frame.BackgroundTransparency = 0.3; frame.BorderSizePixel = 0
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
+    local label = Instance.new("TextLabel", frame); label.Size = UDim2.new(0.7, 0, 0, 20); label.Position = UDim2.new(0, 12, 0, 8)
+    label.Text = text; label.TextColor3 = Color3.new(1, 1, 1); label.Font = Enum.Font.GothamMedium; label.TextSize = 13
+    label.TextXAlignment = Enum.TextXAlignment.Left; label.BackgroundTransparency = 1
+    local valLabel = Instance.new("TextLabel", frame); valLabel.Size = UDim2.new(0.3, -12, 0, 20); valLabel.Position = UDim2.new(0.7, 0, 0, 8)
+    valLabel.Text = tostring(default); valLabel.TextColor3 = Color3.fromRGB(200, 80, 80); valLabel.Font = Enum.Font.GothamBold
+    valLabel.TextSize = 13; valLabel.TextXAlignment = Enum.TextXAlignment.Right; valLabel.BackgroundTransparency = 1
+    local track = Instance.new("Frame", frame); track.Size = UDim2.new(1, -24, 0, 6); track.Position = UDim2.new(0, 12, 0, 38)
+    track.BackgroundColor3 = Color3.fromRGB(35, 35, 45); track.BorderSizePixel = 0
+    Instance.new("UICorner", track).CornerRadius = UDim.new(1, 0)
+    local fill = Instance.new("Frame", track); fill.Size = UDim2.fromScale((default-min)/(max-min), 1)
+    fill.BackgroundColor3 = Color3.fromRGB(180, 30, 30); fill.BorderSizePixel = 0
+    Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
+    local thumb = Instance.new("Frame", track); thumb.Size = UDim2.fromOffset(14, 14); thumb.AnchorPoint = Vector2.new(0.5, 0.5)
+    thumb.Position = UDim2.new((default-min)/(max-min), 0, 0.5, 0); thumb.BackgroundColor3 = Color3.new(1,1,1)
+    thumb.BorderSizePixel = 0; thumb.ZIndex = 2; Instance.new("UICorner", thumb).CornerRadius = UDim.new(1, 0)
+    local dragging = false
+    track.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true end end)
+    UIS.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
+    RS.RenderStepped:Connect(function()
+        if dragging then
+            local p = math.clamp((UIS:GetMouseLocation().X - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
+            fill.Size = UDim2.fromScale(p, 1); thumb.Position = UDim2.new(p, 0, 0.5, 0)
+            local val = math.floor(min + (max-min)*p); valLabel.Text = tostring(val); callback(val)
+        end
+    end)
+end
+
+local function createButton(parent, text, color, callback)
+    local btn = Instance.new("TextButton", parent); btn.Size = UDim2.new(1, 0, 0, 38)
+    btn.BackgroundColor3 = color or Color3.fromRGB(150, 20, 20); btn.BackgroundTransparency = 0.2
+    btn.Text = text; btn.TextColor3 = Color3.new(1,1,1); btn.Font = Enum.Font.GothamBold; btn.TextSize = 13
+    btn.BorderSizePixel = 0; Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+    local shine = Instance.new("UIGradient", btn); shine.Rotation = 90
+    shine.Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.new(1,1,1)), ColorSequenceKeypoint.new(1, Color3.new(0.7,0.7,0.7))})
+    shine.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.7), NumberSequenceKeypoint.new(1, 0.9)})
+    btn.MouseButton1Click:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.1), {BackgroundTransparency = 0}):Play()
+        task.delay(0.15, function() TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundTransparency = 0.2}):Play() end)
+        callback()
+    end)
+    btn.MouseEnter:Connect(function() TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundTransparency = 0.1}):Play() end)
+    btn.MouseLeave:Connect(function() TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundTransparency = 0.2}):Play() end)
+    return btn
+end
+
+local function createDropdown(parent, text, options, callback)
+    local container = Instance.new("Frame", parent); container.Size = UDim2.new(1, 0, 0, 40)
+    container.BackgroundColor3 = Color3.fromRGB(20, 20, 27); container.BackgroundTransparency = 0.3
+    container.BorderSizePixel = 0; container.ClipsDescendants = false
+    Instance.new("UICorner", container).CornerRadius = UDim.new(0, 8)
+    local lbl = Instance.new("TextLabel", container); lbl.Size = UDim2.new(0.5, 0, 0, 40); lbl.Position = UDim2.new(0, 12, 0, 0)
+    lbl.Text = text; lbl.Font = Enum.Font.GothamMedium; lbl.TextSize = 13; lbl.TextColor3 = Color3.new(1,1,1)
+    lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.BackgroundTransparency = 1
+    local selected = Instance.new("TextButton", container); selected.Size = UDim2.new(0.45, 0, 0, 28)
+    selected.Position = UDim2.new(0.53, 0, 0.5, -14); selected.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+    selected.Text = options[1]; selected.TextColor3 = Color3.fromRGB(200, 80, 80); selected.Font = Enum.Font.GothamMedium
+    selected.TextSize = 11; selected.ZIndex = 10; Instance.new("UICorner", selected).CornerRadius = UDim.new(0, 6)
+    local optHolder = Instance.new("Frame", container); optHolder.Size = UDim2.new(1, 0, 0, 0)
+    optHolder.Position = UDim2.new(0, 0, 0, 40); optHolder.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    optHolder.BorderSizePixel = 0; optHolder.ClipsDescendants = true; optHolder.ZIndex = 20
+    Instance.new("UICorner", optHolder).CornerRadius = UDim.new(0, 6)
+    Instance.new("UIStroke", optHolder).Color = Color3.fromRGB(60, 60, 80)
+    local ddLayout = Instance.new("UIListLayout", optHolder); ddLayout.Padding = UDim.new(0, 2)
+    local ddPad = Instance.new("UIPadding", optHolder); ddPad.PaddingTop = UDim.new(0, 4); ddPad.PaddingBottom = UDim.new(0, 4)
+    local itemHeight = 30; local totalH = #options * itemHeight + 8; local open = false
+    for _, opt in ipairs(options) do
+        local optBtn = Instance.new("TextButton", optHolder); optBtn.Size = UDim2.new(1, 0, 0, itemHeight)
+        optBtn.BackgroundTransparency = 1; optBtn.Text = opt; optBtn.TextColor3 = Color3.fromRGB(200, 200, 220)
+        optBtn.Font = Enum.Font.Gotham; optBtn.TextSize = 11; optBtn.ZIndex = 21
+        optBtn.MouseButton1Click:Connect(function()
+            selected.Text = opt; callback(opt); open = false
+            TweenService:Create(optHolder, TweenInfo.new(0.2), {Size = UDim2.new(1, 0, 0, 0)}):Play()
+            TweenService:Create(container, TweenInfo.new(0.2), {Size = UDim2.new(1, 0, 0, 40)}):Play()
+        end)
+    end
+    selected.MouseButton1Click:Connect(function()
+        open = not open
+        TweenService:Create(optHolder, TweenInfo.new(0.25, Enum.EasingStyle.Quart), {Size = UDim2.new(1, 0, 0, open and totalH or 0)}):Play()
+        TweenService:Create(container, TweenInfo.new(0.25, Enum.EasingStyle.Quart), {Size = UDim2.new(1, 0, 0, open and (40+totalH) or 40)}):Play()
+    end)
+end
+
+local function createInput(parent, placeholder, callback)
+    local frame = Instance.new("Frame", parent); frame.Size = UDim2.new(1, 0, 0, 40)
+    frame.BackgroundColor3 = Color3.fromRGB(20, 20, 27); frame.BackgroundTransparency = 0.3; frame.BorderSizePixel = 0
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
+    local box = Instance.new("TextBox", frame); box.Size = UDim2.new(1, -16, 1, 0); box.Position = UDim2.new(0, 8, 0, 0)
+    box.BackgroundTransparency = 1; box.Text = ""; box.PlaceholderText = placeholder
+    box.PlaceholderColor3 = Color3.fromRGB(100, 100, 120); box.TextColor3 = Color3.new(1,1,1)
+    box.Font = Enum.Font.Gotham; box.TextSize = 12; box.TextXAlignment = Enum.TextXAlignment.Left
+    box.FocusLost:Connect(function(enter) if enter then callback(box.Text) end end)
+    return frame, box
+end
+
+-- ================================================
+-- FUNÇÃO DE DISFARCE COM ANIMAÇÕES INTEGRADAS
+-- ================================================
+local ANIM_SLOTS = {
+    "idle", "walk", "run", "jump", "fall",
+    "climb", "sit", "toolnone", "toolslash",
+    "toollunge", "swim", "swimidle",
+}
+
+local function applyDisguise(targetPlayer)
+    if not targetPlayer or not targetPlayer.Character then
+        notify("Disfarce", "Jogador sem personagem", Color3.fromRGB(180, 30, 30)); return
+    end
+
+    -- Salva original ANTES do primeiro disfarce
+    if not disguiseActive then
+        originalAppearance = {}
+        if player.Character then
+            for _, obj in pairs(player.Character:GetChildren()) do
+                if obj:IsA("Accessory") or obj:IsA("Shirt") or obj:IsA("Pants")
+                    or obj:IsA("BodyColors") or obj:IsA("ShirtGraphic") then
+                    originalAppearance[#originalAppearance + 1] = obj:Clone()
+                end
+            end
+            -- Salva animações originais
+            local myAnimate = player.Character:FindFirstChild("Animate")
+            if myAnimate then
+                originalAppearance._animateClone = myAnimate:Clone()
+            end
+        end
+    end
+
+    -- Remove roupa atual
+    for _, obj in pairs(player.Character:GetChildren()) do
+        if obj:IsA("Accessory") or obj:IsA("Shirt") or obj:IsA("Pants") or obj:IsA("ShirtGraphic") then
+            obj:Destroy()
+        end
+    end
+
+    -- Copia roupas e acessórios
+    local copied = 0
+    for _, obj in pairs(targetPlayer.Character:GetChildren()) do
+        if obj:IsA("Accessory") or obj:IsA("Shirt") or obj:IsA("Pants") or obj:IsA("ShirtGraphic") then
+            obj:Clone().Parent = player.Character; copied += 1
+        end
+    end
+
+    -- Copia cores de pele
+    local tCol = targetPlayer.Character:FindFirstChildOfClass("BodyColors")
+    local mCol = player.Character:FindFirstChildOfClass("BodyColors")
+    if tCol and mCol then
+        mCol.HeadColor3     = tCol.HeadColor3
+        mCol.TorsoColor3    = tCol.TorsoColor3
+        mCol.LeftArmColor3  = tCol.LeftArmColor3
+        mCol.RightArmColor3 = tCol.RightArmColor3
+        mCol.LeftLegColor3  = tCol.LeftLegColor3
+        mCol.RightLegColor3 = tCol.RightLegColor3
+    end
+
+    -- Copia face
+    local tHead = targetPlayer.Character:FindFirstChild("Head")
+    local mHead = player.Character:FindFirstChild("Head")
+    if tHead and mHead then
+        local tFace = tHead:FindFirstChildOfClass("Decal")
+        local mFace = mHead:FindFirstChildOfClass("Decal")
+        if tFace and mFace then mFace.Texture = tFace.Texture end
+    end
+
+    -- Copia animações (andar, correr, pular, etc.)
+    local targetAnimate = targetPlayer.Character:FindFirstChild("Animate")
+    local myAnimate = player.Character:FindFirstChild("Animate")
+    local animsCopied = 0
+
+    if targetAnimate and myAnimate then
+        for _, slotName in ipairs(ANIM_SLOTS) do
+            local tSlot = targetAnimate:FindFirstChild(slotName)
+            local mSlot = myAnimate:FindFirstChild(slotName)
+            if tSlot and mSlot then
+                -- Remove animações atuais do slot
+                for _, child in pairs(mSlot:GetChildren()) do
+                    child:Destroy()
+                end
+                -- Copia as do alvo
+                for _, child in pairs(tSlot:GetChildren()) do
+                    child:Clone().Parent = mSlot
+                    animsCopied += 1
+                end
+            end
+        end
+        -- Reinicia o Animate para carregar os novos IDs
+        myAnimate.Disabled = true
+        task.wait(0.1)
+        myAnimate.Disabled = false
+        notify("Disfarce",
+            string.format("Disfarçado como %s — %d roupas + %d animações", targetPlayer.Name, copied, animsCopied),
+            Color3.fromRGB(200, 150, 30))
+    else
+        notify("Disfarce",
+            string.format("Disfarçado como %s — %d roupas (sem Animate)", targetPlayer.Name, copied),
+            Color3.fromRGB(200, 150, 30))
+    end
+
+    disguiseActive = true
+    disguiseLabel.Text = "🎭 " .. targetPlayer.Name
+end
+
+-- ================================================
+-- CONTEÚDO DAS ABAS
+-- ================================================
+
+local combateTab = tabFrames["COMBATE"]
+createSection(combateTab, "MIRA")
+createToggle(combateTab, "AUTO-AIMBOT", "Trava mira no inimigo mais próximo", function(t) Config.Aimbot = t end)
+createToggle(combateTab, "MOSTRAR FOV", "Exibe o círculo de alcance do aimbot", function(t) Config.ShowFOV = t end)
+createSlider(combateTab, "RAIO DO FOV", 10, 800, 150, function(v) Config.FOV = v end)
+createDropdown(combateTab, "OSSO ALVO", {"HumanoidRootPart", "Head", "UpperTorso"}, function(v) Config.AimbotBone = v end)
+createSection(combateTab, "DETECÇÃO")
+createToggle(combateTab, "ESP BRILHANTE", "Destaca jogadores através de paredes", function(t) Config.ESP = t end)
+createToggle(combateTab, "ESP NOMES", "Nome flutuante acima de cada jogador", function(t) Config.ESPNames = t end)
+createToggle(combateTab, "ESP DISTÂNCIA", "Exibe distância em tempo real", function(t) Config.ESPDistance = t end)
+createSection(combateTab, "HITBOX")
+createToggle(combateTab, "HITBOX SUPREMA", "Aumenta a área de acerto do inimigo", function(t) Config.Hitbox = t end)
+createSlider(combateTab, "TAMANHO HITBOX", 2, 70, 15, function(v) Config.HitboxSize = v end)
+createSection(combateTab, "CROSSHAIR")
+createToggle(combateTab, "CROSSHAIR", "Mira personalizada no centro da tela", function(t) Config.Crosshair = t; updateCrosshair() end)
+createSlider(combateTab, "TAMANHO CROSSHAIR", 5, 40, 10, function(v) Config.CrosshairSize = v; updateCrosshair() end)
+
+local movTab = tabFrames["MOVIMENTO"]
+createSection(movTab, "LOCOMOÇÃO")
+createToggle(movTab, "VOAR (FLY)", "Permite voar livremente pelo mapa", function(t) Config.Fly = t end)
+createSlider(movTab, "VELOCIDADE DE VOO", 16, 350, 16, function(v) Config.Speed = v end)
+createToggle(movTab, "NOCLIP (FANTASMA)", "Atravessa paredes e objetos sólidos", function(t) Config.Noclip = t end)
+createToggle(movTab, "PULO INFINITO", "Permite pular no ar infinitamente", function(t)
+    Config.InfiniteJump = t
+    if t then
+        UIS.JumpRequest:Connect(function()
+            if Config.InfiniteJump and player.Character and player.Character:FindFirstChild("Humanoid") then
+                player.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+            end
+        end)
+    end
+end)
+createSection(movTab, "VELOCIDADE")
+createToggle(movTab, "SPEED BOOST", "Aumenta velocidade de caminhada", function(t)
+    Config.SpeedBoost = t
+    if player.Character and player.Character:FindFirstChild("Humanoid") then
+        player.Character.Humanoid.WalkSpeed = t and Config.SpeedBoostValue or 16
+    end
+end)
+createSlider(movTab, "VALOR DO SPEED", 16, 500, 50, function(v)
+    Config.SpeedBoostValue = v
+    if Config.SpeedBoost and player.Character and player.Character:FindFirstChild("Humanoid") then
+        player.Character.Humanoid.WalkSpeed = v
+    end
+end)
+createSection(movTab, "CÂMERA LIVRE")
+createToggle(movTab, "FREECAM", "Câmera independente do personagem", function(t)
+    Config.Freecam = t
+    if t then
+        freecamCF = cam.CFrame
+        cam.CameraType = Enum.CameraType.Scriptable
+        notify("Freecam", "Ativado — WASD + Q/E + botão direito", Color3.fromRGB(80, 120, 200))
+    else
+        cam.CameraType = Enum.CameraType.Custom
+        if player.Character and player.Character:FindFirstChild("Humanoid") then
+            cam.CameraSubject = player.Character.Humanoid
+        end
+        notify("Freecam", "Desativado", Color3.fromRGB(80, 80, 100))
+    end
+end)
+createSlider(movTab, "VELOCIDADE FREECAM", 10, 200, 30, function(v) Config.FreecamSpeed = v end)
+
+local mundoTab = tabFrames["MUNDO"]
+createSection(mundoTab, "AMBIENTE")
+createToggle(mundoTab, "FULLBRIGHT", "Remove sombras e clareia o mapa todo", function(t) Config.FullBright = t end)
+createToggle(mundoTab, "INVISIBILIDADE REAL", "Torna seu personagem invisível", function(t)
+    if t then loadstring(game:HttpGet('https://pastebin.com/raw/3Rnd9rHf'))() end
+end)
+createSection(mundoTab, "GRAVIDADE")
+createSlider(mundoTab, "GRAVIDADE DO MUNDO", 10, 500, 196, function(v)
+    Config.Gravity = v; workspace.Gravity = v
+    notify("Mundo", "Gravidade → " .. v, Color3.fromRGB(100, 150, 200))
+end)
+createButton(mundoTab, "🌍  GRAVIDADE NORMAL (196)", Color3.fromRGB(40, 60, 100), function()
+    workspace.Gravity = 196.2; Config.Gravity = 196.2
+    notify("Mundo", "Gravidade restaurada", Color3.fromRGB(60, 100, 180))
+end)
+createButton(mundoTab, "🌙  GRAVIDADE LUNAR (32)", Color3.fromRGB(30, 30, 80), function()
+    workspace.Gravity = 32; Config.Gravity = 32
+    notify("Mundo", "Gravidade lunar ativada", Color3.fromRGB(80, 80, 200))
+end)
+createButton(mundoTab, "🚀  SEM GRAVIDADE (1)", Color3.fromRGB(20, 20, 60), function()
+    workspace.Gravity = 1; Config.Gravity = 1
+    notify("Mundo", "Sem gravidade ativado", Color3.fromRGB(100, 100, 255))
+end)
+createSection(mundoTab, "TEMPO")
+createButton(mundoTab, "☀️  DIA (12H)", Color3.fromRGB(180, 120, 20), function()
+    Lighting.TimeOfDay = "12:00:00"; notify("Mundo", "Horário → meio-dia", Color3.fromRGB(200, 150, 30))
+end)
+createButton(mundoTab, "🌙  NOITE (0H)", Color3.fromRGB(20, 30, 100), function()
+    Lighting.TimeOfDay = "00:00:00"; notify("Mundo", "Horário → meia-noite", Color3.fromRGB(50, 80, 200))
+end)
+createButton(mundoTab, "🌅  AMANHECER (6H)", Color3.fromRGB(150, 80, 30), function()
+    Lighting.TimeOfDay = "06:00:00"; notify("Mundo", "Horário → amanhecer", Color3.fromRGB(200, 120, 50))
+end)
+
+local adminTab = tabFrames["ADMIN"]
+createSection(adminTab, "PROTEÇÃO")
+createToggle(adminTab, "GOD MODE", "Impede que sua vida chegue a zero", function(t)
+    Config.GodMode = t
+    if t and player.Character and player.Character:FindFirstChild("Humanoid") then
+        player.Character.Humanoid.MaxHealth = math.huge
+        player.Character.Humanoid.Health = math.huge
+    end
+end)
+createToggle(adminTab, "ANTI-KICK", "Bloqueia tentativas de expulsão", function(t) Config.AntiKick = t end)
+createSection(adminTab, "NOME NO JOGO")
+createInput(adminTab, "Novo nome acima da cabeça...", function(name)
+    Config.CustomName = name
+    if player.Character and player.Character:FindFirstChild("Humanoid") then
+        player.Character.Humanoid.DisplayName = name
+        notify("Admin", "Nome → " .. name, Color3.fromRGB(180, 120, 20))
+    end
+end)
+createButton(adminTab, "🏷️  RESTAURAR NOME ORIGINAL", Color3.fromRGB(60, 40, 20), function()
+    if player.Character and player.Character:FindFirstChild("Humanoid") then
+        player.Character.Humanoid.DisplayName = player.DisplayName; Config.CustomName = ""
+        notify("Admin", "Nome restaurado", Color3.fromRGB(120, 80, 30))
+    end
+end)
+createSection(adminTab, "CONTROLE GERAL")
+createButton(adminTab, "❄️  CONGELAR TODOS", Color3.fromRGB(30, 80, 160), function()
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            p.Character.HumanoidRootPart.Anchored = true
+        end
+    end
+    notify("Admin", "Todos congelados", Color3.fromRGB(30, 100, 200))
+end)
+createButton(adminTab, "🔥  DESCONGELAR TODOS", Color3.fromRGB(160, 60, 20), function()
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            p.Character.HumanoidRootPart.Anchored = false
+        end
+    end
+    notify("Admin", "Todos descongelados", Color3.fromRGB(200, 80, 30))
+end)
+createButton(adminTab, "💀  MATAR TODOS", Color3.fromRGB(120, 10, 10), function()
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= player and p.Character and p.Character:FindFirstChild("Humanoid") then
+            p.Character.Humanoid.Health = 0
+        end
+    end
+    notify("Admin", "Todos eliminados", Color3.fromRGB(200, 20, 20))
+end)
+createButton(adminTab, "🌀  TELEPORTAR TODOS PARA MIM", Color3.fromRGB(80, 20, 120), function()
+    if not player.Character then return end
+    local myPos = player.Character.HumanoidRootPart.CFrame
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            p.Character.HumanoidRootPart.CFrame = myPos + Vector3.new(math.random(-5,5), 0, math.random(-5,5))
+        end
+    end
+    notify("Admin", "Todos teleportados para você", Color3.fromRGB(120, 40, 180))
+end)
+createSection(adminTab, "TELEPORTE")
+createButton(adminTab, "📍  IR PARA O SPAWN", Color3.fromRGB(30, 100, 50), function()
+    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        player.Character.HumanoidRootPart.CFrame = CFrame.new(0, 10, 0)
+        notify("Teleporte", "Teleportado para o spawn", Color3.fromRGB(50, 180, 80))
+    end
+end)
+createSection(adminTab, "LOG DE AÇÕES")
+local logFrame = Instance.new("Frame", adminTab)
+logFrame.Size = UDim2.new(1, 0, 0, 180); logFrame.BackgroundColor3 = Color3.fromRGB(14, 14, 20)
+logFrame.BackgroundTransparency = 0.2; logFrame.BorderSizePixel = 0
+Instance.new("UICorner", logFrame).CornerRadius = UDim.new(0, 8)
+local logScroll = Instance.new("ScrollingFrame", logFrame)
+logScroll.Size = UDim2.new(1, -8, 1, -8); logScroll.Position = UDim2.new(0, 4, 0, 4)
+logScroll.BackgroundTransparency = 1; logScroll.ScrollBarThickness = 2
+logScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y; logScroll.CanvasSize = UDim2.new(0,0,0,0)
+local logLayout = Instance.new("UIListLayout", logScroll); logLayout.Padding = UDim.new(0, 2)
+local logEntries = {}
+local function refreshLog()
+    for _, e in ipairs(logEntries) do e:Destroy() end; logEntries = {}
+    for _, entry in ipairs(actionLog) do
+        local row = Instance.new("TextLabel", logScroll); row.Size = UDim2.new(1, 0, 0, 18)
+        row.Text = "[" .. entry.time .. "] " .. entry.text
+        row.Font = Enum.Font.Gotham; row.TextSize = 10
+        row.TextColor3 = Color3.fromRGB(180, 180, 200); row.BackgroundTransparency = 1
+        row.TextXAlignment = Enum.TextXAlignment.Left; table.insert(logEntries, row)
+    end
+end
+createButton(adminTab, "🔄  ATUALIZAR LOG", Color3.fromRGB(40, 40, 70), function()
+    refreshLog(); notify("Log", "Log atualizado", Color3.fromRGB(80, 80, 180))
+end)
+
+local jogTab = tabFrames["JOGADORES"]
+createSection(jogTab, "BUSCAR JOGADOR")
+local searchQuery = ""
+createInput(jogTab, "🔍  Nome do jogador...", function(txt) searchQuery = txt:lower() end)
+local playerListFrame = Instance.new("Frame", jogTab)
+playerListFrame.Size = UDim2.new(1, 0, 0, 10); playerListFrame.BackgroundTransparency = 1
+playerListFrame.AutomaticSize = Enum.AutomaticSize.Y
+local playerListLayout = Instance.new("UIListLayout", playerListFrame); playerListLayout.Padding = UDim.new(0, 6)
+
+local function buildPlayerList()
+    for _, c in ipairs(playerListFrame:GetChildren()) do
+        if not c:IsA("UIListLayout") then c:Destroy() end
+    end
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p == player then continue end
+        if searchQuery ~= "" and not p.Name:lower():find(searchQuery) then continue end
+        local card = Instance.new("Frame", playerListFrame)
+        card.Size = UDim2.new(1, 0, 0, 120); card.BackgroundColor3 = Color3.fromRGB(18, 18, 26)
+        card.BackgroundTransparency = 0.2; card.BorderSizePixel = 0
+        Instance.new("UICorner", card).CornerRadius = UDim.new(0, 8)
+        local cardStroke = Instance.new("UIStroke", card); cardStroke.Thickness = 1; cardStroke.Color = Color3.fromRGB(50, 50, 70)
+        local nameLbl = Instance.new("TextLabel", card); nameLbl.Size = UDim2.new(1, -10, 0, 22); nameLbl.Position = UDim2.new(0, 8, 0, 6)
+        nameLbl.Text = "👤 " .. p.Name; nameLbl.Font = Enum.Font.GothamBold; nameLbl.TextSize = 13
+        nameLbl.TextColor3 = Color3.new(1,1,1); nameLbl.BackgroundTransparency = 1; nameLbl.TextXAlignment = Enum.TextXAlignment.Left
+        local distLbl = Instance.new("TextLabel", card); distLbl.Size = UDim2.new(1, -10, 0, 16); distLbl.Position = UDim2.new(0, 8, 0, 26)
+        distLbl.Font = Enum.Font.Gotham; distLbl.TextSize = 10; distLbl.TextColor3 = Color3.fromRGB(140,140,160)
+        distLbl.BackgroundTransparency = 1; distLbl.TextXAlignment = Enum.TextXAlignment.Left
+        RS.RenderStepped:Connect(function()
+            if p.Character and player.Character and p.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("HumanoidRootPart") then
+                local dist = math.floor((p.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude)
+                distLbl.Text = "📏 " .. dist .. " studs"
+            else distLbl.Text = "📏 fora do jogo" end
+        end)
+        local function makeRow(parent, h)
+            local row = Instance.new("Frame", parent); row.Size = UDim2.new(1, -16, 0, h); row.BackgroundTransparency = 1
+            local rl = Instance.new("UIListLayout", row); rl.FillDirection = Enum.FillDirection.Horizontal; rl.Padding = UDim.new(0, 4)
+            return row
+        end
+        local function smallBtn(parent, txt, col, cb)
+            local b = Instance.new("TextButton", parent); b.Size = UDim2.new(0, 56, 1, 0)
+            b.BackgroundColor3 = col; b.BackgroundTransparency = 0.3; b.Text = txt
+            b.TextColor3 = Color3.new(1,1,1); b.Font = Enum.Font.GothamBold; b.TextSize = 9; b.BorderSizePixel = 0
+            Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6); b.MouseButton1Click:Connect(cb)
+        end
+        local row1 = makeRow(card, 26); row1.Position = UDim2.new(0, 8, 0, 46)
+        smallBtn(row1, "❄️ Frz", Color3.fromRGB(30,80,160), function()
+            if p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                p.Character.HumanoidRootPart.Anchored = true; notify("Admin", p.Name.." congelado", Color3.fromRGB(30,100,200))
+            end
+        end)
+        smallBtn(row1, "🔥 Des", Color3.fromRGB(160,60,20), function()
+            if p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                p.Character.HumanoidRootPart.Anchored = false; notify("Admin", p.Name.." descongelado", Color3.fromRGB(200,80,30))
+            end
+        end)
+        smallBtn(row1, "💀 Kill", Color3.fromRGB(120,10,10), function()
+            if p.Character and p.Character:FindFirstChild("Humanoid") then
+                p.Character.Humanoid.Health = 0; notify("Admin", p.Name.." eliminado", Color3.fromRGB(200,20,20))
+            end
+        end)
+        smallBtn(row1, "🌀 TP", Color3.fromRGB(80,20,120), function()
+            if p.Character and p.Character:FindFirstChild("HumanoidRootPart") and player.Character then
+                p.Character.HumanoidRootPart.CFrame = player.Character.HumanoidRootPart.CFrame + Vector3.new(2,0,0)
+                notify("Admin", p.Name.." tp para você", Color3.fromRGB(120,40,180))
+            end
+        end)
+        local row2 = makeRow(card, 26); row2.Position = UDim2.new(0, 8, 0, 76)
+        smallBtn(row2, "📍 Ir", Color3.fromRGB(30,100,50), function()
+            if player.Character and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                player.Character.HumanoidRootPart.CFrame = p.Character.HumanoidRootPart.CFrame + Vector3.new(2,0,0)
+                notify("Teleporte", "Você foi até "..p.Name, Color3.fromRGB(50,180,80))
+            end
+        end)
+        smallBtn(row2, "🎥 Spy", Color3.fromRGB(60,40,100), function()
+            if p.Character then
+                cam.CameraSubject = p.Character:FindFirstChild("Humanoid") or p.Character.HumanoidRootPart
+                notify("Câmera", "Espiando "..p.Name, Color3.fromRGB(100,60,160))
+            end
+        end)
+        smallBtn(row2, "👁️ Voltar", Color3.fromRGB(40,40,60), function()
+            if player.Character and player.Character:FindFirstChild("Humanoid") then
+                cam.CameraSubject = player.Character.Humanoid; notify("Câmera", "Restaurada", Color3.fromRGB(80,80,100))
+            end
+        end)
+        smallBtn(row2, "🎭 Roupa", Color3.fromRGB(100,60,20), function()
+            applyDisguise(p)
+        end)
+    end
+end
+
+createButton(jogTab, "🔄  ATUALIZAR LISTA", Color3.fromRGB(40,40,70), function()
+    buildPlayerList(); notify("Jogadores", "Lista atualizada", Color3.fromRGB(80,80,180))
+end)
+
+-- ABA DISFARCE
+local disfarceTab = tabFrames["DISFARCE"]
+createSection(disfarceTab, "COPIAR APARÊNCIA + ANIMAÇÕES")
+
+local infoFrame = Instance.new("Frame", disfarceTab)
+infoFrame.Size = UDim2.new(1, 0, 0, 50); infoFrame.BackgroundColor3 = Color3.fromRGB(20, 18, 10)
+infoFrame.BackgroundTransparency = 0.3; infoFrame.BorderSizePixel = 0
+Instance.new("UICorner", infoFrame).CornerRadius = UDim.new(0, 8)
+local infoText = Instance.new("TextLabel", infoFrame)
+infoText.Size = UDim2.new(1, -16, 1, 0); infoText.Position = UDim2.new(0, 8, 0, 0)
+infoText.Text = "Copia roupa, acessórios, face, cores de pele e animações de andar/correr/pular com Robux."
+infoText.Font = Enum.Font.Gotham; infoText.TextSize = 10; infoText.TextColor3 = Color3.fromRGB(220, 180, 80)
+infoText.BackgroundTransparency = 1; infoText.TextWrapped = true; infoText.TextXAlignment = Enum.TextXAlignment.Left
+
+createSection(disfarceTab, "SELECIONAR ALVO")
+local disguisePlayerList = Instance.new("Frame", disfarceTab)
+disguisePlayerList.Size = UDim2.new(1, 0, 0, 10); disguisePlayerList.BackgroundTransparency = 1
+disguisePlayerList.AutomaticSize = Enum.AutomaticSize.Y
+Instance.new("UIListLayout", disguisePlayerList).Padding = UDim.new(0, 6)
+
+local function buildDisguisePlayerList()
+    for _, c in ipairs(disguisePlayerList:GetChildren()) do
+        if not c:IsA("UIListLayout") then c:Destroy() end
+    end
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p == player then continue end
+        local card = Instance.new("Frame", disguisePlayerList)
+        card.Size = UDim2.new(1, 0, 0, 50); card.BackgroundColor3 = Color3.fromRGB(20, 18, 10)
+        card.BackgroundTransparency = 0.3; card.BorderSizePixel = 0
+        Instance.new("UICorner", card).CornerRadius = UDim.new(0, 8)
+        local cStroke = Instance.new("UIStroke", card); cStroke.Color = Color3.fromRGB(80, 60, 20); cStroke.Thickness = 1
+        local pName = Instance.new("TextLabel", card)
+        pName.Size = UDim2.new(0.55, 0, 1, 0); pName.Position = UDim2.new(0, 10, 0, 0)
+        pName.Text = "🎭 " .. p.Name; pName.Font = Enum.Font.GothamMedium; pName.TextSize = 13
+        pName.TextColor3 = Color3.new(1, 1, 1); pName.BackgroundTransparency = 1
+        pName.TextXAlignment = Enum.TextXAlignment.Left
+        local copyBtn = Instance.new("TextButton", card)
+        copyBtn.Size = UDim2.new(0, 110, 0, 28); copyBtn.Position = UDim2.new(1, -118, 0.5, -14)
+        copyBtn.BackgroundColor3 = Color3.fromRGB(120, 80, 10); copyBtn.BackgroundTransparency = 0.2
+        copyBtn.Text = "COPIAR TUDO"; copyBtn.TextColor3 = Color3.new(1, 1, 1)
+        copyBtn.Font = Enum.Font.GothamBold; copyBtn.TextSize = 10; copyBtn.BorderSizePixel = 0
+        Instance.new("UICorner", copyBtn).CornerRadius = UDim.new(0, 6)
+        copyBtn.MouseButton1Click:Connect(function() applyDisguise(p) end)
+        copyBtn.MouseEnter:Connect(function() TweenService:Create(copyBtn, TweenInfo.new(0.15), {BackgroundTransparency = 0.1}):Play() end)
+        copyBtn.MouseLeave:Connect(function() TweenService:Create(copyBtn, TweenInfo.new(0.15), {BackgroundTransparency = 0.2}):Play() end)
+    end
+end
+
+createButton(disfarceTab, "🔄  ATUALIZAR LISTA", Color3.fromRGB(60, 50, 10), function()
+    buildDisguisePlayerList(); notify("Disfarce", "Lista atualizada", Color3.fromRGB(180, 140, 20))
+end)
+
+createSection(disfarceTab, "RESTAURAR")
+createButton(disfarceTab, "🔙  RESTAURAR APARÊNCIA + ANIMAÇÕES", Color3.fromRGB(60, 20, 20), function()
+    if not disguiseActive then
+        notify("Disfarce", "Nenhum disfarce ativo", Color3.fromRGB(100, 100, 100)); return
+    end
+    if player.Character then
+        for _, obj in pairs(player.Character:GetChildren()) do
+            if obj:IsA("Accessory") or obj:IsA("Shirt") or obj:IsA("Pants") or obj:IsA("ShirtGraphic") then
+                obj:Destroy()
+            end
+        end
+        for _, obj in ipairs(originalAppearance) do
+            if typeof(obj) == "Instance" then obj:Clone().Parent = player.Character end
+        end
+        -- Restaura animações originais
+        if originalAppearance._animateClone then
+            local myAnimate = player.Character:FindFirstChild("Animate")
+            if myAnimate then
+                for _, slotName in ipairs(ANIM_SLOTS) do
+                    local origSlot = originalAppearance._animateClone:FindFirstChild(slotName)
+                    local mySlot = myAnimate:FindFirstChild(slotName)
+                    if origSlot and mySlot then
+                        for _, child in pairs(mySlot:GetChildren()) do child:Destroy() end
+                        for _, child in pairs(origSlot:GetChildren()) do child:Clone().Parent = mySlot end
+                    end
+                end
+                myAnimate.Disabled = true; task.wait(0.1); myAnimate.Disabled = false
+            end
+        end
+    end
+    disguiseActive = false; disguiseLabel.Text = ""
+    notify("Disfarce", "Aparência e animações restauradas", Color3.fromRGB(80, 180, 80))
+end)
+
+createSection(disfarceTab, "DISFARCE RÁPIDO")
+createButton(disfarceTab, "🎲  COPIAR JOGADOR ALEATÓRIO", Color3.fromRGB(80, 40, 80), function()
+    local targets = {}
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= player and p.Character then table.insert(targets, p) end
+    end
+    if #targets == 0 then notify("Disfarce", "Nenhum jogador disponível", Color3.fromRGB(180,30,30)); return end
+    applyDisguise(targets[math.random(1, #targets)])
+end)
+
+local configTab = tabFrames["CONFIG"]
+createSection(configTab, "APARÊNCIA")
+for i, theme in ipairs(Themes) do
+    createButton(configTab, "🎨  TEMA " .. theme.name:upper(), Color3.fromHSV(theme.h, 0.8, 0.5), function()
+        Config.Theme = theme.h; notify("Tema", "Tema → " .. theme.name, Color3.fromHSV(theme.h, 0.8, 0.8))
+    end)
+end
+createSection(configTab, "HOTKEY DO MENU")
+createDropdown(configTab, "TECLA ABRIR", {"P", "RightBracket", "F4", "Insert", "Home"}, function(v)
+    local mapping = {P=Enum.KeyCode.P, RightBracket=Enum.KeyCode.RightBracket, F4=Enum.KeyCode.F4, Insert=Enum.KeyCode.Insert, Home=Enum.KeyCode.Home}
+    Config.MenuKey = mapping[v] or Enum.KeyCode.P; notify("Config", "Tecla → " .. v, Color3.fromRGB(80, 120, 180))
+end)
+createSection(configTab, "PERFIS")
+createInput(configTab, "Nome do perfil...", function(name)
+    if name == "" then return end
+    Profiles[name] = {}; for k, v in pairs(Config) do Profiles[name][k] = v end
+    currentProfileName = name; notify("Perfil", "'" .. name .. "' salvo", Color3.fromRGB(60, 160, 60))
+end)
+createButton(configTab, "💾  SALVAR PERFIL ATUAL", Color3.fromRGB(30, 80, 30), function()
+    if currentProfileName == "Padrão" then notify("Perfil", "Digite um nome acima", Color3.fromRGB(180,100,20)); return end
+    Profiles[currentProfileName] = {}; for k, v in pairs(Config) do Profiles[currentProfileName][k] = v end
+    notify("Perfil", "'" .. currentProfileName .. "' atualizado", Color3.fromRGB(60, 160, 60))
+end)
+createButton(configTab, "📂  CARREGAR PERFIL", Color3.fromRGB(30, 50, 100), function()
+    if not Profiles[currentProfileName] then notify("Perfil", "Perfil não encontrado", Color3.fromRGB(180,30,30)); return end
+    for k, v in pairs(Profiles[currentProfileName]) do Config[k] = v end
+    notify("Perfil", "'" .. currentProfileName .. "' carregado", Color3.fromRGB(60, 120, 200))
+end)
+createSection(configTab, "SISTEMA")
+createButton(configTab, "🔄  RECARREGAR PERSONAGEM", Color3.fromRGB(50, 50, 100), function()
+    player:LoadCharacter(); notify("Sistema", "Personagem recarregado", Color3.fromRGB(80, 80, 180))
+end)
+createButton(configTab, "📋  COPIAR USER ID", Color3.fromRGB(40, 80, 40), function()
+    setclipboard(tostring(player.UserId)); notify("Sistema", "User ID: " .. player.UserId, Color3.fromRGB(60, 160, 60))
+end)
+
+-- DRAG PRINCIPAL
+local dragging2, dragStart2, startPos2
+dragHandle.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging2 = true; dragStart2 = input.Position; startPos2 = main.Position
+    end
+end)
+UIS.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement and dragging2 then
+        local delta = input.Position - dragStart2
+        main.Position = UDim2.new(startPos2.X.Scale, startPos2.X.Offset + delta.X, startPos2.Y.Scale, startPos2.Y.Offset + delta.Y)
+        shadow.Position = main.Position
+    end
+end)
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging2 = false end
+end)
+
+-- DRAG MINI BAR
+local miniDragging, miniDragStart, miniStartPos
+miniBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        miniDragging = true; miniDragStart = input.Position; miniStartPos = miniBar.Position
+    end
+end)
+UIS.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement and miniDragging then
+        local delta = input.Position - miniDragStart
+        miniBar.Position = UDim2.new(miniStartPos.X.Scale, miniStartPos.X.Offset + delta.X, miniStartPos.Y.Scale, miniStartPos.Y.Offset + delta.Y)
+    end
+end)
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then miniDragging = false end
+end)
+
+-- FLY + FREECAM
+local bodyVel, bodyGyro
+RS.RenderStepped:Connect(function()
+    if Config.Fly and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        local hrp = player.Character.HumanoidRootPart
+        if not hrp:FindFirstChild("YurixFlyVel") then
+            bodyVel = Instance.new("BodyVelocity", hrp); bodyVel.Name = "YurixFlyVel"; bodyVel.MaxForce = Vector3.new(9e9,9e9,9e9)
+            bodyGyro = Instance.new("BodyGyro", hrp); bodyGyro.Name = "YurixFlyGyro"; bodyGyro.MaxTorque = Vector3.new(9e9,9e9,9e9)
+        end
+        local moveDir = Vector3.zero
+        if UIS:IsKeyDown(Enum.KeyCode.W) then moveDir += cam.CFrame.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.S) then moveDir -= cam.CFrame.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.A) then moveDir -= cam.CFrame.RightVector end
+        if UIS:IsKeyDown(Enum.KeyCode.D) then moveDir += cam.CFrame.RightVector end
+        if UIS:IsKeyDown(Enum.KeyCode.Space) then moveDir += Vector3.yAxis end
+        if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then moveDir -= Vector3.yAxis end
+        bodyVel.Velocity = moveDir * Config.Speed; bodyGyro.CFrame = cam.CFrame
+    else
+        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local hrp = player.Character.HumanoidRootPart
+            if hrp:FindFirstChild("YurixFlyVel") then hrp.YurixFlyVel:Destroy() end
+            if hrp:FindFirstChild("YurixFlyGyro") then hrp.YurixFlyGyro:Destroy() end
+        end
+    end
+
+    if Config.Freecam then
+        local move = Vector3.zero
+        if UIS:IsKeyDown(Enum.KeyCode.W) then move += freecamCF.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.S) then move -= freecamCF.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.A) then move -= freecamCF.RightVector end
+        if UIS:IsKeyDown(Enum.KeyCode.D) then move += freecamCF.RightVector end
+        if UIS:IsKeyDown(Enum.KeyCode.E) then move += Vector3.yAxis end
+        if UIS:IsKeyDown(Enum.KeyCode.Q) then move -= Vector3.yAxis end
+        freecamCF = freecamCF * CFrame.new(move * Config.FreecamSpeed * 0.016)
+        if UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+            local delta = UIS:GetMouseDelta()
+            freecamCF = CFrame.new(freecamCF.Position)
+                * CFrame.Angles(0, math.rad(-delta.X * 0.3), 0)
+                * CFrame.Angles(math.rad(-delta.Y * 0.3), 0, 0)
+        end
+        cam.CFrame = freecamCF
+    end
+end)
+
+-- LOOP PRINCIPAL
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Thickness = 1.5; FOVCircle.Filled = false
+
+local espLabels = {}
+local gradAngle = 0
+local glowPulse = 0
+
+RS.RenderStepped:Connect(function()
+    hue = (hue + 0.004) % 1
+    local baseHue = (Config.Theme + hue) % 1
+    local color = Color3.fromHSV(baseHue, 0.9, 1)
+    local colorDark = Color3.fromHSV(baseHue, 0.7, 0.3)
+    local colorMid = Color3.fromHSV((baseHue + 0.15) % 1, 0.8, 0.2)
+
+    stroke.Color = color; headerTitle.TextColor3 = color; headerDivider.BackgroundColor3 = color
+    miniStroke.Color = color; miniTitle.TextColor3 = color
+    activeBarGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, color),
+        ColorSequenceKeypoint.new(1, Color3.fromHSV((baseHue + 0.3) % 1, 0.8, 1)),
+    })
+
+    gradAngle = (gradAngle + 0.3) % 360
+    bgGradient.Rotation = gradAngle
+    bgGradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, colorDark),
+        ColorSequenceKeypoint.new(0.5, colorMid),
+        ColorSequenceKeypoint.new(1, Color3.fromHSV((baseHue + 0.5) % 1, 0.6, 0.18)),
+    })
+
+    for _, star in ipairs(stars) do
+        star.x += star.speedX; star.y += star.speedY
+        if star.x > 1.05 then star.x = -0.05 elseif star.x < -0.05 then star.x = 1.05 end
+        if star.y > 1.05 then star.y = -0.05 elseif star.y < -0.05 then star.y = 1.05 end
+        star.pulse += star.pulseSpeed
+        local brightness = 0.5 + 0.5 * math.sin(star.pulse)
+        star.obj.Position = UDim2.fromScale(star.x, star.y)
+        star.obj.BackgroundColor3 = Color3.fromHSV((baseHue + star.hueOffset) % 1, 0.6, 1)
+        star.obj.BackgroundTransparency = 0.2 + (1 - brightness) * 0.6
+        local s = star.size * (0.8 + brightness * 0.4); star.obj.Size = UDim2.fromOffset(s, s)
+    end
+
+    for _, sl in ipairs(scanLines) do
+        sl.y += sl.speed; if sl.y > 1.02 then sl.y = -0.02 end
+        sl.obj.Position = UDim2.fromScale(0, sl.y)
+        sl.grad.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromHSV(baseHue, 0.3, 1)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromHSV((baseHue + 0.1) % 1, 0.5, 1)),
+            ColorSequenceKeypoint.new(1, Color3.fromHSV(baseHue, 0.3, 1)),
+        })
+    end
+
+    glowPulse = (glowPulse + 0.02) % (math.pi * 2)
+    local pAlpha = 0.5 + 0.2 * math.sin(glowPulse)
+    glow1.ImageColor3 = color; glow1.ImageTransparency = pAlpha
+    glow2.ImageColor3 = Color3.fromHSV((baseHue + 0.5) % 1, 0.8, 1); glow2.ImageTransparency = pAlpha + 0.1
+
+    headerGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 20, 28)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(12, 12, 16)),
+    })
+
+    updateCrosshair()
+
+    if Config.Noclip and player.Character then
+        for _, v in pairs(player.Character:GetDescendants()) do
+            if v:IsA("BasePart") then v.CanCollide = false end
+        end
+    end
+
+    if Config.FullBright then Lighting.Ambient = Color3.new(1,1,1); Lighting.GlobalShadows = false end
+
+    if Config.GodMode and player.Character and player.Character:FindFirstChild("Humanoid") then
+        if player.Character.Humanoid.Health < player.Character.Humanoid.MaxHealth then
+            player.Character.Humanoid.Health = player.Character.Humanoid.MaxHealth
+        end
+    end
+
+    FOVCircle.Visible = Config.Aimbot and Config.ShowFOV
+    FOVCircle.Radius = Config.FOV; FOVCircle.Color = color
+    FOVCircle.Position = Vector2.new(cam.ViewportSize.X / 2, cam.ViewportSize.Y / 2)
+
+    if Config.Aimbot then
+        local target = nil; local dist = Config.FOV
+        local center = Vector2.new(cam.ViewportSize.X / 2, cam.ViewportSize.Y / 2)
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= player and p.Character and p.Character:FindFirstChild(Config.AimbotBone)
+                and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 then
+                local pos, vis = cam:WorldToViewportPoint(p.Character[Config.AimbotBone].Position)
+                if vis then
+                    local m = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                    if m < dist then dist = m; target = p.Character[Config.AimbotBone] end
+                end
+            end
+        end
+        if target then cam.CFrame = CFrame.new(cam.CFrame.Position, target.Position) end
+    end
+
+    for pid, lbl in pairs(espLabels) do lbl:Remove(); espLabels[pid] = nil end
+
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            local hrp = p.Character.HumanoidRootPart
+            if Config.Hitbox then
+                hrp.Size = Vector3.new(Config.HitboxSize, Config.HitboxSize, Config.HitboxSize)
+                hrp.Transparency = 0.8; hrp.CanCollide = false; hrp.Massless = true
+            else hrp.Size = Vector3.new(2, 2, 1); hrp.Transparency = 0 end
+            if Config.ESP then
+                if not p.Character:FindFirstChild("YurixHighlight") then
+                    local h = Instance.new("Highlight", p.Character); h.Name = "YurixHighlight"
+                    h.FillColor = color; h.OutlineColor = color
+                else p.Character.YurixHighlight.FillColor = color; p.Character.YurixHighlight.OutlineColor = color end
+            else if p.Character:FindFirstChild("YurixHighlight") then p.Character.YurixHighlight:Destroy() end end
+            if Config.ESPNames or Config.ESPDistance then
+                local headPos = p.Character:FindFirstChild("Head")
+                if headPos then
+                    local pos, vis = cam:WorldToViewportPoint(headPos.Position + Vector3.new(0, 2.5, 0))
+                    if vis then
+                        local dist2 = math.floor((hrp.Position - (player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character.HumanoidRootPart.Position or hrp.Position)).Magnitude)
+                        local txt = ""
+                        if Config.ESPNames then txt = p.Name end
+                        if Config.ESPDistance then txt = txt .. (txt ~= "" and "\n" or "") .. dist2 .. "m" end
+                        local label = Drawing.new("Text"); label.Text = txt
+                        label.Position = Vector2.new(pos.X, pos.Y); label.Size = 14
+                        label.Color = color; label.Outline = true; label.OutlineColor = Color3.new(0,0,0)
+                        label.Center = true; label.Visible = true; espLabels[p.UserId] = label
+                    end
+                end
+            end
+        end
+    end
+end)
+
+UIS.InputBegan:Connect(function(i, g)
+    if not g and i.KeyCode == Config.MenuKey then toggleMenu() end
+end)
+
+task.delay(0.5, function()
+    notify("Yurix Hub V5.0", "Painel carregado! Pressione P para abrir.", Color3.fromRGB(150, 30, 30))
+    buildPlayerList()
+    buildDisguisePlayerList()
+end)
